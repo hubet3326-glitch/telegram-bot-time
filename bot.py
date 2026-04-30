@@ -72,8 +72,10 @@ def save_history(user_name, action, duration, number):
 
 # ====== START ======
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    msg = await update.message.reply_text("👉 Chọn chức năng:", reply_markup=MENU)
-    asyncio.create_task(auto_delete(msg))
+    await update.message.reply_text(
+        "👉 Chọn chức năng:",
+        reply_markup=MENU
+    )
 
 # ====== HANDLE ======
 async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
