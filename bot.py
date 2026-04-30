@@ -6,10 +6,14 @@ from openpyxl import Workbook
 import os
 
 # ====== LẤY TOKEN TỪ RAILWAY ======
+import os
+
 TOKEN = os.getenv("BOT_TOKEN")
 
+print("DEBUG TOKEN:", TOKEN)
+
 if not TOKEN:
-    raise ValueError("❌ Chưa set BOT_TOKEN trong Railway")
+    print("❌ Không đọc được BOT_TOKEN")
 
 # ====== DATA ======
 user_state = {}
