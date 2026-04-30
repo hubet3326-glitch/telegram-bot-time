@@ -5,23 +5,24 @@ from datetime import datetime
 from openpyxl import Workbook
 import os
 
+# ================== DATA ==================
 user_state = {}
 history = {}
 
 MENU = ReplyKeyboardMarkup(
-    [["🚽 Đi vệ sinh", "Đi vệ sinh 15p"],
+    [["🚽 Đi vệ sinh", "🚽 Đi vệ sinh 15p"],
      ["🍚 Đi ăn", "🔙 Quay lại"],
      ["/report"]],
     resize_keyboard=True
 )
 
-# Giới hạn thời gian (giây)
 TIME_LIMITS = {
     "🚽 Đi vệ sinh": 10 * 60,
-    "Đi vệ sinh 15p": 15 * 60,
+    "🚽 Đi vệ sinh 15p": 15 * 60,
     "🍚 Đi ăn": 30 * 60
 }
 
+# ================== SAVE ==================
 def save_history(user_name, action, duration, number):
     today = datetime.now().strftime("%Y-%m-%d")
 
@@ -37,25 +38,27 @@ def save_history(user_name, action, duration, number):
         "number": number
     })
 
-# Lệnh start
+# ================== START ==================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("👉 Chọn chức năng:", reply_markup=MENU)
+    await update.message.reply_text(
+        "👉 Chọn chức năng:\n\n⚠️ Nhắn riêng bot 1 lần để nhận thông báo phạt!",
+        reply_markup=MENU
+    )
 
-# Xử lý tin nhắn
+# ================== HANDLE ==================
 async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.message.from_user.id
     user_name = update.message.from_user.full_name
     text = update.message.text
 
-    # 🚫 Nếu đang có hành động mà bấm cái khác
+    # 🚫 Không cho spam lệnh
     if user_id in user_state and text != "🔙 Quay lại":
         await update.message.reply_text(
-            "⚠️ Bạn đang thực hiện một chức năng.\n"
-            "👉 Vui lòng bấm 'Quay lại' để kết thúc trước."
+            "⚠️ Bạn đang thực hiện một chức năng.\n👉 Hãy bấm 'Quay lại' trước."
         )
         return
 
-    # Bắt đầu hành động
+    # ===== START =====
     if text in TIME_LIMITS:
         user_state[user_id] = {
             "action": text,
@@ -63,7 +66,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         }
         await update.message.reply_text(f"⏱️ Bắt đầu: {text}")
 
-    # Kết thúc hành động
+    # ===== BACK =====
     elif text == "🔙 Quay lại":
         if user_id not in user_state:
             await update.message.reply_text("❌ Bạn chưa thực hiện chức năng nào.")
@@ -77,35 +80,33 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         limit = TIME_LIMITS[data["action"]]
 
-        # 👉 Tính số lần
+        # 👉 tính số lần
         today = datetime.now().strftime("%Y-%m-%d")
         count = 1
         if today in history and user_name in history[today]:
             count = len(history[today][user_name]) + 1
 
-        # 👉 Lưu
+        # 👉 lưu
         save_history(user_name, data["action"], elapsed, count)
 
-        # 👉 Quá giờ
+        # ===== QUÁ GIỜ =====
         if elapsed > limit:
             overtime_min = (elapsed - limit) // 60
 
-            msg = (
+            await update.message.reply_text(
                 f"❌ {data['action']}\n"
                 f"⏱️ {minutes} phút {seconds} giây\n"
-                f"🚫 Bạn đã vượt quá thời gian cho phép."
+                f"🚫 Bạn đã vượt quá thời gian!"
             )
 
-            await update.message.reply_text(msg)
-
-            # 🔥 Gửi riêng (phạt)
+            # 👉 gửi riêng
             try:
                 if 1 <= overtime_min < 10:
                     await context.bot.send_message(
                         chat_id=user_id,
                         text="💸 Chúc mừng bạn đã tốn 100k"
                     )
-                elif overtime_min > 10:
+                elif overtime_min >= 10:
                     await context.bot.send_message(
                         chat_id=user_id,
                         text="💸 Chúc mừng bạn đã tốn 500k"
@@ -113,19 +114,19 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except:
                 pass
 
+        # ===== ĐÚNG GIỜ =====
         else:
-            msg = (
+            await update.message.reply_text(
                 f"✅ {data['action']} xong\n"
                 f"⏱️ {minutes} phút {seconds} giây"
             )
-            await update.message.reply_text(msg)
 
         del user_state[user_id]
 
     else:
         await update.message.reply_text("❓ Lệnh không hợp lệ")
 
-# Xuất Excel
+# ================== REPORT ==================
 async def report(update: Update, context: ContextTypes.DEFAULT_TYPE):
     today = datetime.now().strftime("%Y-%m-%d")
 
@@ -166,11 +167,12 @@ async def report(update: Update, context: ContextTypes.DEFAULT_TYPE):
     file_name = f"baocao_{today}.xlsx"
     wb.save(file_name)
 
-    await update.message.reply_document(open(file_name, "rb"))
+    with open(file_name, "rb") as f:
+        await update.message.reply_document(f)
 
-# MAIN
+# ================== MAIN ==================
 if __name__ == "__main__":
-    app = ApplicationBuilder().token("8441261019:AAF5U4TPkJR6s1VDiaMrBGmU1QQ4tWHnxZw").build()
+    app = ApplicationBuilder().token(os.getenv("8441261019:AAF5U4TPkJR6s1VDiaMrBGmU1QQ4tWHnxZw")).build()
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("report", report))
