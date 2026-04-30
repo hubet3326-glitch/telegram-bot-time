@@ -12,13 +12,11 @@ from telegram.ext import (
     filters,
 )
 
-# ====== LẤY TOKEN ======
+# ====== CONFIG ======
 TOKEN = os.getenv("BOT_TOKEN")
 
 if not TOKEN:
-    raise ValueError("❌ Chưa set BOT_TOKEN trên Railway")
-
-print("✅ Bot đang khởi động...")
+    raise ValueError("❌ Chưa set BOT_TOKEN trong Railway")
 
 # ====== DATA ======
 user_state = {}
@@ -40,7 +38,7 @@ TIME_LIMITS = {
 }
 
 
-# ====== SAVE HISTORY ======
+# ====== FUNCTIONS ======
 def save_history(user_name, action, duration, number):
     today = datetime.now().strftime("%Y-%m-%d")
 
@@ -50,30 +48,27 @@ def save_history(user_name, action, duration, number):
     if user_name not in history[today]:
         history[today][user_name] = []
 
-    history[today][user_name].append(
-        {
-            "action": action,
-            "duration": duration,
-            "number": number,
-        }
-    )
+    history[today][user_name].append({
+        "action": action,
+        "duration": duration,
+        "number": number
+    })
 
 
-# ====== START ======
+# ====== COMMANDS ======
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("👉 Chọn chức năng:", reply_markup=MENU)
 
 
-# ====== HANDLE ======
 async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.message.from_user.id
     user_name = update.message.from_user.full_name
     text = update.message.text
 
-    # Nếu đang chạy
+    # Nếu đang chạy mà bấm cái khác
     if user_id in user_state and text != "🔙 Quay lại":
         await update.message.reply_text(
-            "⚠️ Đang chạy chức năng.\n👉 Bấm 'Quay lại' để kết thúc."
+            "⚠️ Bạn đang thực hiện chức năng.\n👉 Bấm 'Quay lại' trước."
         )
         return
 
@@ -81,7 +76,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if text in TIME_LIMITS:
         user_state[user_id] = {
             "action": text,
-            "start": time.time(),
+            "start": time.time()
         }
         await update.message.reply_text(f"⏱️ Bắt đầu: {text}")
 
@@ -101,19 +96,22 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         today = datetime.now().strftime("%Y-%m-%d")
         count = 1
-
         if today in history and user_name in history[today]:
             count = len(history[today][user_name]) + 1
 
         save_history(user_name, data["action"], elapsed, count)
 
-        # quá giờ
         if elapsed > limit:
+            overtime = (elapsed - limit) // 60
+
             await update.message.reply_text(
-                f"❌ {data['action']}\n"
-                f"⏱️ {minutes}p {seconds}s\n"
-                f"🚫 Quá giờ!"
+                f"❌ {data['action']}\n⏱️ {minutes}p {seconds}s\n🚫 Quá giờ"
             )
+
+            if overtime >= 1 and overtime < 10:
+                await update.message.reply_text("💸 Mất 100k")
+            elif overtime >= 10:
+                await update.message.reply_text("💸 Mất 500k")
         else:
             await update.message.reply_text(
                 f"✅ {data['action']} xong\n⏱️ {minutes}p {seconds}s"
@@ -122,10 +120,9 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         del user_state[user_id]
 
     else:
-        await update.message.reply_text("❓ Lệnh không hợp lệ")
+        await update.message.reply_text("❓ Không hợp lệ")
 
 
-# ====== REPORT ======
 async def report(update: Update, context: ContextTypes.DEFAULT_TYPE):
     today = datetime.now().strftime("%Y-%m-%d")
 
@@ -135,31 +132,25 @@ async def report(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     wb = Workbook()
     ws = wb.active
-    ws.title = "Bao cao"
 
     ws.append(["Tên", "Hành động", "Phút", "Lần", "Trạng thái"])
 
     for user_name, actions in history[today].items():
         for item in actions:
-            duration_min = round(item["duration"] / 60, 2)
-
+            duration = round(item["duration"] / 60, 2)
             limit = TIME_LIMITS[item["action"]]
 
-            status = (
-                "Quá giờ ❌"
-                if item["duration"] > limit
-                else "Đúng giờ ✅"
-            )
+            status = "Đúng giờ"
+            if item["duration"] > limit:
+                status = "Quá giờ"
 
-            ws.append(
-                [
-                    user_name,
-                    item["action"],
-                    duration_min,
-                    item["number"],
-                    status,
-                ]
-            )
+            ws.append([
+                user_name,
+                item["action"],
+                duration,
+                item["number"],
+                status
+            ])
 
     file_name = f"report_{today}.xlsx"
     wb.save(file_name)
@@ -168,12 +159,16 @@ async def report(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # ====== MAIN ======
-if __name__ == "__main__":
+def main():
     app = ApplicationBuilder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("report", report))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle))
 
-    print("🚀 Bot đang chạy...")
+    print("✅ Bot đang chạy...")
     app.run_polling()
+
+
+if __name__ == "__main__":
+    main()
