@@ -172,7 +172,8 @@ async def report(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ================== MAIN ==================
 if __name__ == "__main__":
-    app = ApplicationBuilder().token(os.getenv("8441261019:AAF5U4TPkJR6s1VDiaMrBGmU1QQ4tWHnxZw")).build()
+    TOKEN = os.getenv("8441261019:AAF5U4TPkJR6s1VDiaMrBGmU1QQ4tWHnxZw")
+app = ApplicationBuilder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("report", report))
