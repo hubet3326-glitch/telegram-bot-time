@@ -74,7 +74,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_name = update.message.from_user.full_name
         text = update.message.text
 
-        # Đang chạy mà bấm cái khác
+        # 🚫 Đang chạy mà bấm cái khác
         if user_id in user_state and text != "🔙 Quay lại":
             await update.message.reply_text(
                 "⚠️ Bạn đang thực hiện chức năng.\n👉 Bấm 'Quay lại' trước."
@@ -103,35 +103,36 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             limit = TIME_LIMITS[data["action"]]
 
+            # 👉 Tính số lần
             today = datetime.now().strftime("%Y-%m-%d")
             count = 1
             if today in history and user_name in history[today]:
                 count = len(history[today][user_name]) + 1
 
+            # 👉 Lưu lịch sử
             save_history(user_name, data["action"], elapsed, count)
 
             # ===== CHECK GIỜ =====
             if elapsed > limit:
-                overtime = (elapsed - limit) // 60
+                overtime_min = (elapsed - limit) // 60
 
                 await update.message.reply_text(
-                    f"❌ {data['action']}\n⏱️ {minutes}p {seconds}s\n🚫 Quá giờ"
+                    f"❌ {data['action']}\n"
+                    f"⏱️ {minutes} phút {seconds} giây\n"
+                    f"🚫 Bạn đã đi quá thời gian quy định"
                 )
-
-                if 1 <= overtime < 10:
-                    await update.message.reply_text("💸 Mất 100k")
-                elif overtime >= 10:
-                    await update.message.reply_text("💸 Mất 500k")
 
             else:
                 await update.message.reply_text(
-                    f"✅ {data['action']} xong\n⏱️ {minutes}p {seconds}s"
+                    f"✅ {data['action']} xong\n"
+                    f"⏱️ {minutes} phút {seconds} giây"
                 )
 
+            # 👉 Xóa trạng thái
             del user_state[user_id]
 
         else:
-            await update.message.reply_text("❓ Không hợp lệ")
+            await update.message.reply_text("❓ Lệnh không hợp lệ")
 
     except Exception as e:
         logging.error(f"Lỗi handle: {e}")
@@ -148,30 +149,44 @@ async def report(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         wb = Workbook()
         ws = wb.active
+        ws.title = "Báo cáo"
 
-        ws.append(["Tên", "Hành động", "Phút", "Lần", "Trạng thái"])
+        ws.append([
+            "Tên",
+            "Hành động",
+            "Thời gian (phút)",
+            "Lần",
+            "Trạng thái",
+            "Vượt (phút)"
+        ])
 
         for user_name, actions in history[today].items():
             for item in actions:
-                duration = round(item["duration"] / 60, 2)
-                limit = TIME_LIMITS[item["action"]]
+                action = item["action"]
+                duration_sec = item["duration"]
+                duration_min = round(duration_sec / 60, 2)
 
-                status = "Đúng giờ"
-                if item["duration"] > limit:
-                    status = "Quá giờ"
+                limit_sec = TIME_LIMITS[action]
+
+                if duration_sec > limit_sec:
+                    overtime_min = round((duration_sec - limit_sec) / 60, 2)
+                    status = "Quá giờ ❌"
+                else:
+                    overtime_min = 0
+                    status = "Đúng giờ ✅"
 
                 ws.append([
                     user_name,
-                    item["action"],
-                    duration,
+                    action,
+                    duration_min,
                     item["number"],
-                    status
+                    status,
+                    overtime_min
                 ])
 
-        file_name = f"report_{today}.xlsx"
+        file_name = f"baocao_{today}.xlsx"
         wb.save(file_name)
 
-        # QUAN TRỌNG: mở file đúng cách
         with open(file_name, "rb") as f:
             await update.message.reply_document(f)
 
@@ -190,5 +205,6 @@ def main():
     print("✅ Bot đang chạy...")
     app.run_polling()
 
+# ====== RUN ======
 if __name__ == "__main__":
     main()
