@@ -1,6 +1,7 @@
 import os
 import time
 import logging
+import asyncio
 from datetime import datetime
 from openpyxl import Workbook
 
@@ -16,7 +17,6 @@ from telegram.ext import (
 # ====== CONFIG ======
 TOKEN = os.getenv("BOT_TOKEN")
 
-# 👉 THAY ID CỦA BẠN VÀO ĐÂY
 ADMIN_IDS = [8335844317, 8668442264]
 
 # ====== LOG ======
@@ -46,6 +46,14 @@ TIME_LIMITS = {
     "🍚 Đi ăn": 30 * 60,
 }
 
+# ====== AUTO DELETE ======
+async def auto_delete(msg, delay=10):
+    await asyncio.sleep(delay)
+    try:
+        await msg.delete()
+    except:
+        pass
+
 # ====== SAVE ======
 def save_history(user_name, action, duration, number):
     today = datetime.now().strftime("%Y-%m-%d")
@@ -64,7 +72,8 @@ def save_history(user_name, action, duration, number):
 
 # ====== START ======
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("👉 Chọn chức năng:", reply_markup=MENU)
+    msg = await update.message.reply_text("👉 Chọn chức năng:", reply_markup=MENU)
+    asyncio.create_task(auto_delete(msg))
 
 # ====== HANDLE ======
 async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -74,7 +83,8 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # 🚫 đang chạy
     if user_id in user_state and text != "🔙 Quay lại":
-        await update.message.reply_text("⚠️ Bấm 'Quay lại' trước.")
+        msg = await update.message.reply_text("⚠️ Bấm 'Quay lại' trước.")
+        asyncio.create_task(auto_delete(msg))
         return
 
     # ===== BẮT ĐẦU =====
@@ -84,7 +94,8 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if text == "🍚 Đi ăn":
             count = sum(1 for u in user_state.values() if u["action"] == "🍚 Đi ăn")
             if count >= 2:
-                await update.message.reply_text("🚫 Đã đủ 2 người đi ăn rồi!")
+                msg = await update.message.reply_text("🚫 Đã đủ 2 người đi ăn rồi!")
+                asyncio.create_task(auto_delete(msg))
                 return
 
         user_state[user_id] = {
@@ -92,12 +103,14 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "start": time.time()
         }
 
-        await update.message.reply_text(f"⏱️ Bắt đầu: {text}")
+        msg = await update.message.reply_text(f"⏱️ Bắt đầu: {text}")
+        asyncio.create_task(auto_delete(msg))
 
     # ===== KẾT THÚC =====
     elif text == "🔙 Quay lại":
         if user_id not in user_state:
-            await update.message.reply_text("❌ Chưa có chức năng.")
+            msg = await update.message.reply_text("❌ Chưa có chức năng.")
+            asyncio.create_task(auto_delete(msg))
             return
 
         data = user_state[user_id]
@@ -117,30 +130,33 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         # ===== CHECK GIỜ =====
         if elapsed > limit:
-            await update.message.reply_text(
-                f"❌ {data['action']}\n⏱️ {minutes}p {seconds}s\n🚫 Quá thời gian quy định"
+            msg = await update.message.reply_text(
+                f"❌ {data['action']}\n⏱️ {minutes}p {seconds}s\n🚫 Quá thời gian quy định\n⚠️ Bạn đã đi quá thời gian quy định"
             )
-            await update.message.reply_text("⚠️ Bạn đã đi quá thời gian quy định")
         else:
-            await update.message.reply_text(
+            msg = await update.message.reply_text(
                 f"✅ {data['action']} xong\n⏱️ {minutes}p {seconds}s"
             )
 
+        asyncio.create_task(auto_delete(msg))
         del user_state[user_id]
 
     else:
-        await update.message.reply_text("❓ Không hợp lệ")
+        msg = await update.message.reply_text("❓ Không hợp lệ")
+        asyncio.create_task(auto_delete(msg))
 
-# ====== REPORT (ADMIN ONLY) ======
+# ====== REPORT ======
 async def report(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.message.from_user.id != ADMIN_ID:
-        await update.message.reply_text("🚫 Bạn không có quyền dùng lệnh này")
+    if update.message.from_user.id not in ADMIN_IDS:
+        msg = await update.message.reply_text("🚫 Bạn không có quyền dùng lệnh này")
+        asyncio.create_task(auto_delete(msg))
         return
 
     today = datetime.now().strftime("%Y-%m-%d")
 
     if today not in history:
-        await update.message.reply_text("📭 Chưa có dữ liệu")
+        msg = await update.message.reply_text("📭 Chưa có dữ liệu")
+        asyncio.create_task(auto_delete(msg))
         return
 
     wb = Workbook()
@@ -173,15 +189,17 @@ async def report(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ====== RESET ======
 async def reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.message.from_user.id != ADMIN_IDS:
-        await update.message.reply_text("🚫 Bạn không có quyền")
+    if update.message.from_user.id not in ADMIN_IDS:
+        msg = await update.message.reply_text("🚫 Bạn không có quyền")
+        asyncio.create_task(auto_delete(msg))
         return
 
     global history, user_state
     history = {}
     user_state = {}
 
-    await update.message.reply_text("🔄 Đã reset toàn bộ dữ liệu")
+    msg = await update.message.reply_text("🔄 Đã reset toàn bộ dữ liệu")
+    asyncio.create_task(auto_delete(msg))
 
 # ====== MAIN ======
 def main():
