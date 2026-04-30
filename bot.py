@@ -1,38 +1,46 @@
-from telegram import Update, ReplyKeyboardMarkup
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
+import os
 import time
 from datetime import datetime
 from openpyxl import Workbook
-import os
 
-# ====== LẤY TOKEN TỪ RAILWAY ======
-import os
+from telegram import Update, ReplyKeyboardMarkup
+from telegram.ext import (
+    ApplicationBuilder,
+    CommandHandler,
+    MessageHandler,
+    ContextTypes,
+    filters,
+)
 
+# ====== LẤY TOKEN ======
 TOKEN = os.getenv("BOT_TOKEN")
 
-print("DEBUG TOKEN:", TOKEN)
-
 if not TOKEN:
-    print("❌ Không đọc được BOT_TOKEN")
+    raise ValueError("❌ Chưa set BOT_TOKEN trên Railway")
+
+print("✅ Bot đang khởi động...")
 
 # ====== DATA ======
 user_state = {}
 history = {}
 
 MENU = ReplyKeyboardMarkup(
-    [["🚽 Đi vệ sinh", "Đi vệ sinh 15p"],
-     ["🍚 Đi ăn", "🔙 Quay lại"],
-     ["/report"]],
-    resize_keyboard=True
+    [
+        ["🚽 Đi vệ sinh", "Đi vệ sinh 15p"],
+        ["🍚 Đi ăn", "🔙 Quay lại"],
+        ["/report"],
+    ],
+    resize_keyboard=True,
 )
 
 TIME_LIMITS = {
     "🚽 Đi vệ sinh": 10 * 60,
     "Đi vệ sinh 15p": 15 * 60,
-    "🍚 Đi ăn": 30 * 60
+    "🍚 Đi ăn": 30 * 60,
 }
 
-# ====== SAVE ======
+
+# ====== SAVE HISTORY ======
 def save_history(user_name, action, duration, number):
     today = datetime.now().strftime("%Y-%m-%d")
 
@@ -42,15 +50,19 @@ def save_history(user_name, action, duration, number):
     if user_name not in history[today]:
         history[today][user_name] = []
 
-    history[today][user_name].append({
-        "action": action,
-        "duration": duration,
-        "number": number
-    })
+    history[today][user_name].append(
+        {
+            "action": action,
+            "duration": duration,
+            "number": number,
+        }
+    )
+
 
 # ====== START ======
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("👉 Chọn chức năng:", reply_markup=MENU)
+
 
 # ====== HANDLE ======
 async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -58,10 +70,10 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_name = update.message.from_user.full_name
     text = update.message.text
 
-    # Đang làm mà bấm linh tinh
+    # Nếu đang chạy
     if user_id in user_state and text != "🔙 Quay lại":
         await update.message.reply_text(
-            "⚠️ Bạn đang thực hiện chức năng.\n👉 Bấm 'Quay lại' để kết thúc."
+            "⚠️ Đang chạy chức năng.\n👉 Bấm 'Quay lại' để kết thúc."
         )
         return
 
@@ -69,14 +81,14 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if text in TIME_LIMITS:
         user_state[user_id] = {
             "action": text,
-            "start": time.time()
+            "start": time.time(),
         }
         await update.message.reply_text(f"⏱️ Bắt đầu: {text}")
 
     # Kết thúc
     elif text == "🔙 Quay lại":
         if user_id not in user_state:
-            await update.message.reply_text("❌ Bạn chưa bắt đầu.")
+            await update.message.reply_text("❌ Chưa có chức năng nào.")
             return
 
         data = user_state[user_id]
@@ -84,39 +96,24 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         minutes = elapsed // 60
         seconds = elapsed % 60
+
         limit = TIME_LIMITS[data["action"]]
 
-        # Tính lần
         today = datetime.now().strftime("%Y-%m-%d")
         count = 1
+
         if today in history and user_name in history[today]:
             count = len(history[today][user_name]) + 1
 
         save_history(user_name, data["action"], elapsed, count)
 
-        # Quá giờ
+        # quá giờ
         if elapsed > limit:
-            overtime_min = (elapsed - limit) // 60
-
             await update.message.reply_text(
-                f"❌ {data['action']}\n⏱️ {minutes}p {seconds}s\n🚫 Quá thời gian!"
+                f"❌ {data['action']}\n"
+                f"⏱️ {minutes}p {seconds}s\n"
+                f"🚫 Quá giờ!"
             )
-
-            # Gửi riêng
-            try:
-                if 1 <= overtime_min < 10:
-                    await context.bot.send_message(
-                        chat_id=user_id,
-                        text="💸 Chúc mừng bạn đã tốn 100k"
-                    )
-                elif overtime_min > 10:
-                    await context.bot.send_message(
-                        chat_id=user_id,
-                        text="💸 Chúc mừng bạn đã tốn 500k"
-                    )
-            except:
-                pass
-
         else:
             await update.message.reply_text(
                 f"✅ {data['action']} xong\n⏱️ {minutes}p {seconds}s"
@@ -127,48 +124,48 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text("❓ Lệnh không hợp lệ")
 
+
 # ====== REPORT ======
 async def report(update: Update, context: ContextTypes.DEFAULT_TYPE):
     today = datetime.now().strftime("%Y-%m-%d")
 
     if today not in history:
-        await update.message.reply_text("📭 Chưa có dữ liệu.")
+        await update.message.reply_text("📭 Chưa có dữ liệu")
         return
 
     wb = Workbook()
     ws = wb.active
-    ws.title = "Báo cáo"
+    ws.title = "Bao cao"
 
-    ws.append(["Tên", "Hành động", "Phút", "Lần", "Trạng thái", "Vượt (phút)"])
+    ws.append(["Tên", "Hành động", "Phút", "Lần", "Trạng thái"])
 
     for user_name, actions in history[today].items():
         for item in actions:
-            action = item["action"]
-            duration = item["duration"]
-            duration_min = round(duration / 60, 2)
+            duration_min = round(item["duration"] / 60, 2)
 
-            limit = TIME_LIMITS[action]
+            limit = TIME_LIMITS[item["action"]]
 
-            if duration > limit:
-                overtime = round((duration - limit) / 60, 2)
-                status = "Quá ❌"
-            else:
-                overtime = 0
-                status = "Đúng ✅"
+            status = (
+                "Quá giờ ❌"
+                if item["duration"] > limit
+                else "Đúng giờ ✅"
+            )
 
-            ws.append([
-                user_name,
-                action,
-                duration_min,
-                item["number"],
-                status,
-                overtime
-            ])
+            ws.append(
+                [
+                    user_name,
+                    item["action"],
+                    duration_min,
+                    item["number"],
+                    status,
+                ]
+            )
 
-    file_name = f"baocao_{today}.xlsx"
+    file_name = f"report_{today}.xlsx"
     wb.save(file_name)
 
     await update.message.reply_document(open(file_name, "rb"))
+
 
 # ====== MAIN ======
 if __name__ == "__main__":
