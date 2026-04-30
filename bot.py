@@ -3,6 +3,7 @@ from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, fil
 import time
 from datetime import datetime
 from openpyxl import Workbook
+import os
 
 user_state = {}
 history = {}
@@ -11,8 +12,7 @@ MENU = ReplyKeyboardMarkup(
     [["🚽 Đi vệ sinh", "Đi vệ sinh 15p"],
      ["🍚 Đi ăn", "🔙 Quay lại"],
      ["/report"]],
-    resize_keyboard=True,
-    one_time_keyboard=True
+    resize_keyboard=True
 )
 
 # Giới hạn thời gian (giây)
@@ -77,36 +77,55 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         limit = TIME_LIMITS[data["action"]]
 
-        # 👉 Tính số lần (number)
+        # 👉 Tính số lần
         today = datetime.now().strftime("%Y-%m-%d")
         count = 1
         if today in history and user_name in history[today]:
             count = len(history[today][user_name]) + 1
 
-        # 👉 Lưu dữ liệu
+        # 👉 Lưu
         save_history(user_name, data["action"], elapsed, count)
 
-        # 👉 Thông báo
+        # 👉 Quá giờ
         if elapsed > limit:
+            overtime_min = (elapsed - limit) // 60
+
             msg = (
                 f"❌ {data['action']}\n"
                 f"⏱️ {minutes} phút {seconds} giây\n"
                 f"🚫 Bạn đã vượt quá thời gian cho phép."
             )
+
+            await update.message.reply_text(msg)
+
+            # 🔥 Gửi riêng (phạt)
+            try:
+                if 1 <= overtime_min < 10:
+                    await context.bot.send_message(
+                        chat_id=user_id,
+                        text="💸 Chúc mừng bạn đã tốn 100k"
+                    )
+                elif overtime_min > 10:
+                    await context.bot.send_message(
+                        chat_id=user_id,
+                        text="💸 Chúc mừng bạn đã tốn 500k"
+                    )
+            except:
+                pass
+
         else:
             msg = (
                 f"✅ {data['action']} xong\n"
                 f"⏱️ {minutes} phút {seconds} giây"
             )
-
-        await update.message.reply_text(msg)
+            await update.message.reply_text(msg)
 
         del user_state[user_id]
 
     else:
         await update.message.reply_text("❓ Lệnh không hợp lệ")
 
-# Xuất file Excel
+# Xuất Excel
 async def report(update: Update, context: ContextTypes.DEFAULT_TYPE):
     today = datetime.now().strftime("%Y-%m-%d")
 
@@ -128,7 +147,6 @@ async def report(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             limit_sec = TIME_LIMITS[action]
 
-            # 👉 kiểm tra quá giờ
             if duration_sec > limit_sec:
                 overtime_min = round((duration_sec - limit_sec) / 60, 2)
                 status = "Quá giờ ❌"
@@ -150,13 +168,13 @@ async def report(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_document(open(file_name, "rb"))
 
-# Main
+# MAIN
 if __name__ == "__main__":
-    app = ApplicationBuilder().token("8441261019:AAER1YwQ9tFu4vctmZd-Yd32heb7ieJMhG4").build()
+    app = ApplicationBuilder().token("8441261019:AAF5U4TPkJR6s1VDiaMrBGmU1QQ4tWHnxZw").build()
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("report", report))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle))
 
     print("Bot đang chạy...")
-    app.run_polling(poll_interval=0.5)
+    app.run_polling()
