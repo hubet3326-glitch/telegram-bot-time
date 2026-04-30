@@ -39,9 +39,9 @@ MENU = ReplyKeyboardMarkup(
 )
 
 TIME_LIMITS = {
-    "🚽 Đi vệ sinh": 10 * 60,
-    "Đi vệ sinh 15p": 15 * 60,
-    "🍚 Đi ăn": 30 * 60,
+    "🚽 Đi vệ sinh": 11 * 60,
+    "Đi vệ sinh 15p": 16 * 60,
+    "🍚 Đi ăn": 31 * 60,
 }
 
 # ====== FUNCTIONS ======
