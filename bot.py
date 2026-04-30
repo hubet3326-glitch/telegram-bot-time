@@ -17,7 +17,7 @@ from telegram.ext import (
 TOKEN = os.getenv("BOT_TOKEN")
 
 # 👉 THAY ID CỦA BẠN VÀO ĐÂY
-ADMIN_ID = 8335844317
+ADMIN_IDS = [8335844317, 8668442264]
 
 # ====== LOG ======
 logging.basicConfig(
@@ -173,7 +173,7 @@ async def report(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ====== RESET ======
 async def reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.message.from_user.id != ADMIN_ID:
+    if update.message.from_user.id != ADMIN_IDS:
         await update.message.reply_text("🚫 Bạn không có quyền")
         return
 
