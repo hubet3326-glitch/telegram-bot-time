@@ -96,8 +96,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if text == "🍚 Đi ăn":
             count = sum(1 for u in user_state.values() if u["action"] == "🍚 Đi ăn")
             if count >= 2:
-                msg = await update.message.reply_text("🚫 Đã đủ 2 người đi ăn rồi!")
-                asyncio.create_task(auto_delete(msg))
+                await update.message.reply_text("🚫 Đã đủ 2 người đi ăn rồi!")
                 return
 
         user_state[user_id] = {
@@ -140,7 +139,6 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"✅ {data['action']} xong\n⏱️ {minutes}p {seconds}s"
             )
 
-        asyncio.create_task(auto_delete(msg))
         del user_state[user_id]
 
     else:
