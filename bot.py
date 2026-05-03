@@ -54,6 +54,18 @@ async def auto_delete(msg, delay=10):
     except:
         pass
 
+# ====== ĐẾM SỐ LẦN TRONG NGÀY ======
+def count_today(user_name, action):
+    today = datetime.now().strftime("%Y-%m-%d")
+
+    if today not in history:
+        return 0
+
+    if user_name not in history[today]:
+        return 0
+
+    return sum(1 for item in history[today][user_name] if item["action"] == action)
+
 # ====== SAVE ======
 def save_history(user_name, action, duration, number):
     today = datetime.now().strftime("%Y-%m-%d")
@@ -92,11 +104,24 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # ===== BẮT ĐẦU =====
     if text in TIME_LIMITS:
 
-        # 🔥 Giới hạn 2 người đi ăn
+        # 🚽 15p: chỉ 1 lần/ngày
+        if text == "Đi vệ sinh 15p":
+            if count_today(user_name, text) >= 1:
+                await update.message.reply_text("🚫 Bạn đã dùng hết 1 lần vệ sinh 15p hôm nay")
+                return
+
+        # 🍚 đi ăn: tối đa 3 lần/ngày
         if text == "🍚 Đi ăn":
+
+            # giới hạn 3 lần/ngày
+            if count_today(user_name, text) >= 3:
+                await update.message.reply_text("🚫 Bạn đã vượt quá 3 lần đi ăn hôm nay")
+                return
+
+            # giới hạn 2 người cùng lúc
             count = sum(1 for u in user_state.values() if u["action"] == "🍚 Đi ăn")
             if count >= 2:
-                msg = await update.message.reply_text("🚫 Đã đủ 2 người đi ăn rồi!")
+                await update.message.reply_text("🚫 Đã đủ 2 người đi ăn rồi!")
                 return
 
         user_state[user_id] = {
@@ -131,7 +156,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         # ===== CHECK GIỜ =====
         if elapsed > limit:
-            msg = await update.message.reply_text(
+            await update.message.reply_text(
                 f"❌ {data['action']}\n⏱️ {minutes}p {seconds}s\n🚫 Quá thời gian quy định\n⚠️ Bạn đã đi quá thời gian quy định"
             )
         else:
@@ -139,13 +164,14 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"✅ {data['action']} xong\n⏱️ {minutes}p {seconds}s"
             )
             asyncio.create_task(auto_delete(msg))
+
         del user_state[user_id]
 
     else:
         msg = await update.message.reply_text("❓ Không hợp lệ")
         asyncio.create_task(auto_delete(msg))
 
-# ====== REPORT ======
+# ====== REPORT (ADMIN ONLY) ======
 async def report(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message.from_user.id not in ADMIN_IDS:
         msg = await update.message.reply_text("🚫 Bạn không có quyền dùng lệnh này")
