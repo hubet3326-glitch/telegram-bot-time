@@ -228,9 +228,22 @@ async def reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     msg = await update.message.reply_text("🔄 Đã reset toàn bộ dữ liệu")
     asyncio.create_task(auto_delete(msg))
+web = Flask(__name__)
+
+@web.route("/")
+def home():
+    return "Bot is running"
+
+def run_web():
+    web.run(
+        host="0.0.0.0",
+        port=int(os.environ.get("PORT", 10000))
+    )
 
 # ====== MAIN ======
 def main():
+    threading.Thread(target=run_web).start()
+
     app = ApplicationBuilder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
